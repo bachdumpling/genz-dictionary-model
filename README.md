@@ -1,0 +1,1 @@
+# genz-dictionary-model
