@@ -1,5 +1,6 @@
 Return a javascript object with the 3 slang synonyms and 3 slang antonyms in arrays of these slangs: Boujee, Bussin’, Drip, Extra, Rent-free, Salty, Shook, Vibe check, Woke
 
+Example of last year 2022 most popular slangs:
 Boujee, Bussin’, Drip, Extra, Rent-free, Salty, Shook, Vibe check, Woke
 
 const slangSynonymsAndAntonyms = {

@@ -23,8 +23,11 @@ response = requests.request("GET", url, headers=headers)
 response_data = response.json()
 
 if response_data['status'] == 'ok':
+    print("[")
     for item in response_data['data']['list']:
-        print(f"aweme_id: {item['aweme_id']}")
-        print(f"creator_name: {item['author']['unique_id']}")
+        # print(f"aweme_id: {item['aweme_id']}")
+        # print(f"creator_name: {item['author']['unique_id']}")
+        print(item['aweme_id'], end=", ")
+    print("]")
 else:
     print("API returned an error")

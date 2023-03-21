@@ -187,6 +187,7 @@ for i, string in enumerate(output):
         if response.json().get('list'):
             if response.json().get('list')[0].get('word').lower() == string.lower():
                 accepted_words.append(string)
+                print(f"Success: {string} is a valid word.")
     else:
         print(f"Error: Failed to connect to the API for string {string}.")
 
