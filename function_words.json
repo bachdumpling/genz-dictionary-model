@@ -1,4 +1,5 @@
-export const functionWords = [
+[
+  "I",
   "a",
   "an",
   "the",
@@ -118,4 +119,8 @@ export const functionWords = [
   "when",
   "why",
   "how",
-];
+  "thats",
+  "\"",
+  " ",
+  "’"
+]
