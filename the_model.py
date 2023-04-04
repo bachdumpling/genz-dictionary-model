@@ -88,13 +88,15 @@ def get_comments(api_key, video_id_list, limit=100, offset=''):
         querystring = {"id": video_id, "offset": offset}
         response = requests.request(
             "GET", url, headers=headers, params=querystring)
+
         try:
             data = response.json()["comments"]
-            for i, comment in enumerate(data):
-                if i < limit:  # Add this condition to limit the number of comments per video
-                    comments.append(comment['text'])
-                else:
-                    break
+            if data:  # Add this condition to check if data is not None
+                for i, comment in enumerate(data):
+                    if i < limit:  # Add this condition to limit the number of comments per video
+                        comments.append(comment['text'])
+                    else:
+                        break
         except ValueError:
             print(
                 f"Unexpected response for video ID {video_id}: {response.text}")
@@ -109,41 +111,42 @@ def visualize_top_words(fdist, top_n=10):
     plt.show()
 
 
+video_ids = json.loads(urlopen(
+    "https://raw.githubusercontent.com/bachdumpling/genz-dictionary-model/main/video_ids.json").read())
+# video_ids = [
+#     "7184827416517463342",
+#     "7197107078975049003",
+#     "7182232426884664618",
+#     "7213402901819952427",
+#     "7194449792225873195",
+#     "7190353963588291841",
+#     "7182902025955462446",
+#     "7211900322447396138",
+#     "7208202126663896366"]
+# comments = ["That’s my favorite hole life savings lol",
+#             "Best story ever! I need a part 2 from baby!",
+#             "i love baby babble so much",
+#             "baby fever, Baby Fever, BABY FEVER!!!",
+#             "the wrist roll 😭😭😭 so cute",
+#             "babies listening to their own voices is just so cute!",
+#             "It's funny to think about how babies probably don't know when they say their first word because they probably think they're talking all the time.",
+#             "Omg her covering her mouth while yawning… ugh adorable ☺️",
+#             "That was the most in depth story ever! I was hooked",
+#             "that's how her day went😂😂",
+#             "the covering her mouth for the yawn 🥺❤️",
+#             "i love baby voices 🥺🥺",
+#             "oh my goodness she is so precious U0001f979",
+#             "The caption U0001f979U0001f979",
+#             "🥱🥱🥱oh my goodness🥰🥰🥰",
+#             "it's like she's telling a very serious story about dada!😂😂🥰🥰🥰",
+#             "I don’t want another baby i don’t want another baby i don’t want another baby 😂😂😩😩😩😩",
+#             "her covering her yawn 🥺",
+#             "OMG . So cute 🥰🥰",
+#             "She is so adorable!!",
+#             "Oh no she covered her mouth yawning!!!! That is so cute",]
+
 # video_ids = get_video_ids(api_key)
-# comments = get_comments(api_key, video_ids)
-# video_ids = json.loads(urlopen(
-#     "https://raw.githubusercontent.com/bachdumpling/genz-dictionary-model/main/video_ids.json").read())
-video_ids = [
-    "7184827416517463342",
-    "7197107078975049003",
-    "7182232426884664618",
-    "7213402901819952427",
-    "7194449792225873195",
-    "7190353963588291841",
-    "7182902025955462446",
-    "7211900322447396138",
-    "7208202126663896366"]
-comments = ["That’s my favorite hole life savings lol",
-            "Best story ever! I need a part 2 from baby!",
-            "i love baby babble so much",
-            "baby fever, Baby Fever, BABY FEVER!!!",
-            "the wrist roll 😭😭😭 so cute",
-            "babies listening to their own voices is just so cute!",
-            "It's funny to think about how babies probably don't know when they say their first word because they probably think they're talking all the time.",
-            "Omg her covering her mouth while yawning… ugh adorable ☺️",
-            "That was the most in depth story ever! I was hooked",
-            "that's how her day went😂😂",
-            "the covering her mouth for the yawn 🥺❤️",
-            "i love baby voices 🥺🥺",
-            "oh my goodness she is so precious U0001f979",
-            "The caption U0001f979U0001f979",
-            "🥱🥱🥱oh my goodness🥰🥰🥰",
-            "it's like she's telling a very serious story about dada!😂😂🥰🥰🥰",
-            "I don’t want another baby i don’t want another baby i don’t want another baby 😂😂😩😩😩😩",
-            "her covering her yawn 🥺",
-            "OMG . So cute 🥰🥰",
-            "She is so adorable!!",
-            "Oh no she covered her mouth yawning!!!! That is so cute",]
+comments = get_comments(api_key, video_ids)
 
 print("# of video ids: ", len(video_ids))
 print("# of video comments: ", len(comments))
@@ -158,9 +161,9 @@ punctuation = set(punctuation)
 def combo(sentence):
     duplicated_tokens = word_tokenize(sentence)
     tokens = list(set(duplicated_tokens))
-    
+
     print("dirty tokens", tokens)
-    
+
     accepted_list = []
 
     translator = str.maketrans('', '', string.punctuation)
@@ -172,7 +175,7 @@ def combo(sentence):
         and token.lower() not in function_words
         and token.lower() not in punctuation
     ]
-    
+
     print("clean tokens", cleaned_tokens)
 
     accepted_list.append(cleaned_tokens)
