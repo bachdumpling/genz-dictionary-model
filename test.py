@@ -1,3 +1,5 @@
+# load library
+from string import punctuation
 import os
 import json
 import requests
@@ -6,6 +8,9 @@ import nltk
 from nltk.tokenize import word_tokenize
 from nltk.probability import FreqDist
 import seaborn as sns
+import nltk
+from nltk import pos_tag
+from nltk.tokenize import RegexpTokenizer
 
 
 # import os
@@ -15,6 +20,7 @@ import seaborn as sns
 nltk.download("punkt")
 nltk.download("stopwords")
 nltk.download("vader_lexicon")
+nltk.download('averaged_perceptron_tagger')
 
 # api_key = os.getenv("RAPIDAPI_KEY")
 api_key = "9b38cabe85mshb282f035a7bb13cp1fce86jsnc1693aca1d59"
@@ -22,6 +28,9 @@ headers = {
     "X-RapidAPI-Key": api_key,
     "X-RapidAPI-Host": "tiktok-all-in-one.p.rapidapi.com"
 }
+
+
+punctuation = list(punctuation)
 
 
 def get_video_ids(region, request_limit=30):
@@ -68,14 +77,14 @@ def get_video_comments(video_id, offset=0):
         return []
 
 
-def process_comments(comments):
-    all_words = []
-    for comment in comments:
-        tokens = word_tokenize(comment['text'])
-        all_words.extend(tokens)
+# def process_comments(comments):
+#     all_words = []
+#     for comment in comments:
+#         tokens = word_tokenize(comment['text'])
+#         all_words.extend(tokens)
 
-    fdist = FreqDist(all_words)
-    return fdist
+#     fdist = FreqDist(all_words)
+#     return fdist
 
 
 def visualize_top_words(fdist, top_n=10):
@@ -85,6 +94,47 @@ def visualize_top_words(fdist, top_n=10):
     plt.show()
 
 
+result = []
+
+
+def combo(sentence):
+    duplicated_tokens = word_tokenize(sentence)
+    tokens = list(set(duplicated_tokens))
+    accepted_list = []
+
+    translator = str.maketrans('', '', string.punctuation)
+
+#   cleaned_tokens = [token for token in tokens if token not in stopwords or token not in functionWords and token not in punctuation]
+    cleaned_tokens = [token.lower() for token in tokens if token.lower(
+    ) not in stopwords and token.lower() not in functionWords and token.lower() not in punctuation]
+
+    accepted_list.append(cleaned_tokens)
+
+    combinations = []
+    for i in range(len(cleaned_tokens)):
+        for j in range(i+1, len(cleaned_tokens)+1):
+            combinations.append(" ".join(cleaned_tokens[i:j]))
+    # calculate the frequency distribution of the words
+    freq_dist = FreqDist(combinations)
+
+    # determine the number of unique words in the text
+    num_unique_words = len(freq_dist)
+
+    # calculate the number of words to include in the top 25%
+    num_top_words = int(num_unique_words * 0.25)
+
+    # construct a list of the top 25% most common words
+    top_words = [word for word, freq in freq_dist.most_common(num_top_words)]
+    result.append(top_words)
+
+
+flat_result = []
+
+for sublist in result:
+    for item in sublist:
+        flat_result.append(item)
+
+
 video_ids = get_video_ids(region="US")
 all_comments = []
 
@@ -92,5 +142,6 @@ for video_id in video_ids:
     comments = get_video_comments(video_id)
     all_comments.extend(comments)
 
-fdist = process_comments(all_comments)
-visualize_top_words(fdist)
+# fdist = process_comments(all_comments)
+freq_dist = FreqDist(flat_result)
+visualize_top_words(freq_dist)
