@@ -28,7 +28,7 @@ punctuation = list(punctuation)
 # Get the video ids
 
 
-def get_video_ids(api_key, region='US', request_limit=10):
+def get_video_ids(api_key, region='US', request_limit=50):
     url = "https://tiktok-all-in-one.p.rapidapi.com/feed"
 
     headers = {
@@ -46,6 +46,10 @@ def get_video_ids(api_key, region='US', request_limit=10):
             "region": region, "device_id": "7523368224928586621", "max_cursor": custom_cursor}
         response = requests.request(
             "GET", url, headers=headers, params=querystring)
+
+        if response.status_code != 200:
+            print(f"Error {response.status_code}: {response.text}")
+            break
 
         try:
             response_data = response.json()
@@ -70,7 +74,7 @@ def get_video_ids(api_key, region='US', request_limit=10):
     return video_ids
 
 
-def get_comments(api_key, video_id_list, offset=''):
+def get_comments(api_key, video_id_list, limit=100, offset=''):
     url = "https://tiktok-all-in-one.p.rapidapi.com/video/comments"
 
     headers = {
@@ -86,23 +90,16 @@ def get_comments(api_key, video_id_list, offset=''):
             "GET", url, headers=headers, params=querystring)
         try:
             data = response.json()["comments"]
-            for comment in data:
-                comments.append(comment['text'])
+            for i, comment in enumerate(data):
+                if i < limit:  # Add this condition to limit the number of comments per video
+                    comments.append(comment['text'])
+                else:
+                    break
         except ValueError:
             print(
                 f"Unexpected response for video ID {video_id}: {response.text}")
 
     return comments
-
-
-# def process_comments(comments):
-#     all_words = []
-#     for comment in comments:
-#         tokens = word_tokenize(comment)
-#         all_words.extend(tokens)
-
-#     fdist = FreqDist(all_words)
-#     return fdist
 
 
 def visualize_top_words(fdist, top_n=10):
@@ -113,33 +110,83 @@ def visualize_top_words(fdist, top_n=10):
 
 
 # video_ids = get_video_ids(api_key)
-video_ids = json.loads(urlopen(
-    "https://raw.githubusercontent.com/bachdumpling/genz-dictionary-model/main/video_ids.json").read())
-comments = get_comments(api_key, video_ids)
-# print(comments)
+# comments = get_comments(api_key, video_ids)
+# video_ids = json.loads(urlopen(
+#     "https://raw.githubusercontent.com/bachdumpling/genz-dictionary-model/main/video_ids.json").read())
+video_ids = [
+    "7184827416517463342",
+    "7197107078975049003",
+    "7182232426884664618",
+    "7213402901819952427",
+    "7194449792225873195",
+    "7190353963588291841",
+    "7182902025955462446",
+    "7211900322447396138",
+    "7208202126663896366"]
+comments = ["That’s my favorite hole life savings lol",
+            "Best story ever! I need a part 2 from baby!",
+            "i love baby babble so much",
+            "baby fever, Baby Fever, BABY FEVER!!!",
+            "the wrist roll 😭😭😭 so cute",
+            "babies listening to their own voices is just so cute!",
+            "It's funny to think about how babies probably don't know when they say their first word because they probably think they're talking all the time.",
+            "Omg her covering her mouth while yawning… ugh adorable ☺️",
+            "That was the most in depth story ever! I was hooked",
+            "that's how her day went😂😂",
+            "the covering her mouth for the yawn 🥺❤️",
+            "i love baby voices 🥺🥺",
+            "oh my goodness she is so precious U0001f979",
+            "The caption U0001f979U0001f979",
+            "🥱🥱🥱oh my goodness🥰🥰🥰",
+            "it's like she's telling a very serious story about dada!😂😂🥰🥰🥰",
+            "I don’t want another baby i don’t want another baby i don’t want another baby 😂😂😩😩😩😩",
+            "her covering her yawn 🥺",
+            "OMG . So cute 🥰🥰",
+            "She is so adorable!!",
+            "Oh no she covered her mouth yawning!!!! That is so cute",]
 
-# fdist = process_comments(comments)
-# print(fdist.most_common(10))
+print("# of video ids: ", len(video_ids))
+print("# of video comments: ", len(comments))
+
 result = []
+
+stopwords = set(stopwords)
+function_words = set(function_words)
+punctuation = set(punctuation)
 
 
 def combo(sentence):
     duplicated_tokens = word_tokenize(sentence)
     tokens = list(set(duplicated_tokens))
+    
+    print("dirty tokens", tokens)
+    
     accepted_list = []
 
     translator = str.maketrans('', '', string.punctuation)
 
-    #   cleaned_tokens = [token for token in tokens if token not in stopwords or token not in functionWords and token not in punctuation]
-    cleaned_tokens = [token.lower() for token in tokens if token.lower(
-    ) not in stopwords and token.lower() not in function_words and token.lower() not in punctuation]
+    cleaned_tokens = [
+        token.lower()
+        for token in tokens
+        if token.lower() not in stopwords
+        and token.lower() not in function_words
+        and token.lower() not in punctuation
+    ]
+    
+    print("clean tokens", cleaned_tokens)
 
     accepted_list.append(cleaned_tokens)
 
     combinations = []
+    # for i in range(len(cleaned_tokens)):
+    #     for j in range(i+1, len(cleaned_tokens)+1):
+    #         combinations.append(" ".join(cleaned_tokens[i:j]))
+
     for i in range(len(cleaned_tokens)):
         for j in range(i+1, len(cleaned_tokens)+1):
-            combinations.append(" ".join(cleaned_tokens[i:j]))
+            if j - i > 1:  # Add this condition to only add combinations with more than one token
+                combinations.append(" ".join(cleaned_tokens[i:j]))
+
     # calculate the frequency distribution of the words
     freq_dist = FreqDist(combinations)
 
@@ -166,5 +213,4 @@ for sublist in result:
 freq_dist = FreqDist(flat_result)
 
 print(freq_dist.most_common(10))
-
-# visualize_top_words(freq_dist)
+visualize_top_words(freq_dist, 10)
