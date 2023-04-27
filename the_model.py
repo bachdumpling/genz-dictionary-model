@@ -12,7 +12,7 @@ from urllib.request import urlopen
 from string import punctuation
 import string
 import re
-
+from langdetect import detect, LangDetectException
 
 api_key = "9b38cabe85mshb282f035a7bb13cp1fce86jsnc1693aca1d59"
 
@@ -23,7 +23,34 @@ function_words = json.loads(urlopen(
 # Get the stopwords and punctuation
 nltk.download('stopwords')
 
-stopwords = stopwords.words('english')
+stopwords = set(stopwords.words('english'))
+extra_words = {
+    'im', 'dont', 'bc', 'na',
+    'see', 'would', 'time', 'every',
+    'go', 'like', 'going', 'right',
+    'back', 'looks',
+    'i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves',
+    'you', "you're", "you've", "you'll", "you'd", 'your', 'yours', 'yourself', 'yourselves',
+    'he', 'him', 'his', 'himself', 'she', "she's", 'her', 'hers', 'herself',
+    'it', "it's", 'its', 'itself', 'they', 'them', 'their', 'theirs', 'themselves',
+    'what', 'which', 'who', 'whom', 'this', 'that', "that'll", 'these', 'those',
+    'am', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'having', 'do', 'does', 'did', 'doing',
+    'a', 'an', 'the', 'and', 'but', 'if', 'or', 'because', 'as', 'until', 'while', 'of', 'at', 'by', 'for', 'with', 'about', 'against', 'between', 'into', 'through', 'during', 'before', 'after',
+    'above', 'below', 'to', 'from', 'up', 'down', 'in', 'out', 'on', 'off', 'over', 'under', 'again', 'further', 'then', 'once', 'here', 'there', 'when', 'where', 'why', 'how',
+    'all', 'any', 'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such', 'only', 'own', 'same', 'so', 'than', 'too', 'very',
+    's', 't', 'can', 'will', 'just', 'don', "don't", 'should', "should've", 'now', 'd', 'll', 'm', 'o', 're', 've', 'y', 'ain', 'aren', "aren't", 'couldn', "couldn't", 'didnt', "didn't", 'doesnt', "doesn't", 'hadnt', "hadn't", 'hasnt', "hasn't", 'havent', "haven't", 'isnt', "isn't", 'ma', 'mightnt', "mightn't", 'mustnt', "mustn't", 'needn', "needn't", 'shan', "shan't", 'shouldnt', "shouldn't", 'wasn', "wasn't", 'weren', "weren't", 'won', "won't", 'wouldn', "wouldn't",
+    'bro', 'way', 'much', 'know', 'said', 'people', 'hes', 'got', 'comments', 'eyes', 'thank', 'love', 'oh', 'make', 'school', 'use', 'talking', 'videos', 'family', 'name',   'hello', 'goodbye', 'please', 'thank', 'yes', 'no', 'maybe', 'sure',
+    'morning', 'afternoon', 'evening', 'night', 'today', 'tomorrow', 'yesterday',
+    'work', 'job', 'office', 'home', 'house', 'apartment', 'family', 'friend', 'partner',
+    'eat', 'drink', 'food', 'breakfast', 'lunch', 'dinner', 'snack', 'meal',
+    'happy', 'sad', 'angry', 'excited', 'tired', 'bored', 'surprised', 'worried',
+    'school', 'college', 'university', 'class', 'teacher', 'student', 'study', 'learn',
+    'car', 'bus', 'train', 'bike', 'walk', 'drive', 'ride', 'transportation', 'vehicle', 'isnt', 'seen',
+    'one', 'get', 'say', 'good', 'feel', 'first', 'someone', 'thought', 'water', 'person', 'baby', 'whats', 'done', 'cat', 'ive', 'us', 'next', 'thing', 'something', 'could'
+}
+
+stopwords.update(extra_words)
+
 punctuation = list(punctuation)
 
 
@@ -36,221 +63,28 @@ def remove_emoji(text):
                                "]+", flags=re.UNICODE)
     return emoji_pattern.sub(r'', text)
 
-# Get the video ids
-
-
-def get_video_ids(api_key, region='US', request_limit=50):
-    url = "https://tiktok-all-in-one.p.rapidapi.com/feed"
-
-    headers = {
-        "X-RapidAPI-Key": api_key,
-        "X-RapidAPI-Host": "tiktok-all-in-one.p.rapidapi.com"
-    }
-
-    custom_cursor = ""
-    request_count = 0
-
-    video_ids = []
-
-    while request_count < request_limit:
-        querystring = {
-            "region": region, "device_id": "7523368224928586621", "max_cursor": custom_cursor}
-        response = requests.request(
-            "GET", url, headers=headers, params=querystring)
-
-        if response.status_code != 200:
-            print(f"Error {response.status_code}: {response.text}")
-            break
-
-        try:
-            response_data = response.json()
-        except ValueError:
-            print("Response content:", response.content)
-            raise Exception("Unable to parse response content as JSON")
-
-        if response_data['status_code'] == 0:
-            for item in response_data['aweme_list']:
-                video_ids.append(item['aweme_id'])
-
-            if 'max_cursor' in response_data and response_data['has_more']:
-                custom_cursor = str(response_data['max_cursor'])
-            else:
-                break
-        else:
-            print("API returned an error")
-            break
-
-        request_count += 1
-
-    return video_ids
-
-
-def get_comments(api_key, video_id_list, limit=100, offset=''):
-    url = "https://tiktok-all-in-one.p.rapidapi.com/video/comments"
-
-    headers = {
-        "X-RapidAPI-Key": api_key,
-        "X-RapidAPI-Host": "tiktok-all-in-one.p.rapidapi.com"
-    }
-
-    comments = []
-
-    for video_id in video_id_list:
-        querystring = {"id": video_id, "offset": offset}
-        response = requests.request(
-            "GET", url, headers=headers, params=querystring)
-
-        try:
-            data = response.json()["comments"]
-            if data:  # Add this condition to check if data is not None
-                for i, comment in enumerate(data):
-                    if i < limit:  # Add this condition to limit the number of comments per video
-                        comments.append(comment['text'])
-                    else:
-                        break
-        except ValueError:
-            print(
-                f"Unexpected response for video ID {video_id}: {response.text}")
-
-    return comments
-
 
 def visualize_top_words(fdist, top_n=10):
     df = pd.DataFrame(fdist.most_common(top_n), columns=['Word', 'Frequency'])
-    sns.barplot(data=df, x='Word', y='Frequency')
+    sns.barplot(data=df, x='Frequency', y='Word')  # Switch x and y parameters
     sns.despine()
+    plt.yticks(rotation=0)  # Set y-axis labels to be horizontal
     plt.show()
 
 
-# video_ids = json.loads(urlopen(
-#     "https://raw.githubusercontent.com/bachdumpling/genz-dictionary-model/main/video_ids.json").read())
-# video_ids = [
-#     "7184827416517463342",
-#     "7197107078975049003",
-#     "7182232426884664618",
-#     "7213402901819952427",
-#     "7194449792225873195",
-#     "7190353963588291841",
-#     "7182902025955462446",
-#     "7211900322447396138",
-#     "7208202126663896366",
-#     "7181306374331174187",
-#     "7187890664040926506",
-#     "7188341615164181806",
-#     "7206085337100176682",
-#     "7206103663364852998",
-#     "7200426878073703722",
-#     "7204592339388468481",
-#     "7212091491706015022",
-#     "7209159934733405486",
-#     "7208168943771749637",
-#     "7193375631370095918",
-#     "7205291823231749419",
-#     "7186492820453281070",
-#     "7201610812732099883",
-#     "7202712822642609454",
-#     "7190124019369233665",
-#     "7196184547598486830",
-#     "7187083900810825002",
-#     "7209671556044311854",
-#     "7210634472037911815",
-#     "7201311125932084523",
-#     "7207930079144332590",
-#     "7199003283845991726",
-#     "7207989846533524779",
-#     "7209059168244780334",
-#     "7208720398949829934",
-#     "7211498218654371073",
-#     "7188571775297588526",
-#     "7182016204230446382",
-#     "7183225245829172526",
-#     "7189655032017554693",
-#     "7194920907901652229",
-#     "7192183990961458478",
-#     "7193495843821915435",
-#     "7205639392491277611",
-#     "7193767063062662442",
-#     "7200398286874807594",
-#     "7205744922262031659",
-#     "7193805817915788587",
-#     "7206896158789127466",
-#     "7192032111883291946",
-#     "7181554775647948075",
-#     "7187168152625909038",
-#     "7207149468607647018",
-#     "7206472512203525418",
-#     "7187133725656812843",
-#     "7197525371380681989",
-#     "7182614091125509418",
-#     "7197358324566871302",
-#     "7181267594916285738",
-#     "7208751129813978414",
-#     "7184568813202001194",
-#     "7211523560362396974",
-#     "7196879500825660718",
-#     "7189271964085767429",
-#     "7189094633404632363",
-#     "7204252356731587882",
-#     "7185679934159965486",
-#     "7210254762749611310",
-#     "7192295565323980074",
-#     "7212191269899046150",
-#     "7180487122493672706",
-#     "7212807100299431214",
-#     "7207810304334515499",
-#     "7200216556519935237",
-#     "7187500299270065451",
-#     "7207036734394158338",
-#     "7199708899077819654",
-#     "7211267752806436097",
-#     "7203433251321548074",
-#     "7203864894356229422",
-#     "7195087912956873989",
-#     "7212433372969307434",
-#     "7213006618861063470",
-#     "7191624167282806059",
-#     "7205927647379983658",
-#     "7196000447864376618",
-#     "7200937739825679662",
-#     "7189718947376172293",
-#     "7210877252106538282",
-#     "7208758377755708718",
-#     "7184273195921460523",
-#     "7213028553783397678",
-#     "7213206993581083950",
-#     "7194933430885338410",
-#     "7208530637983124737",
-#     "7194982660702276906",
-#     "7204899118785875243",
-#     "7193815393285246254",
-#     "7198679410181033258",]
-# comments = ["That’s my favorite hole life savings lol",
-            "Best story ever! I need a part 2 from baby!",
-            "i love baby babble so much",
-            "baby fever, Baby Fever, BABY FEVER!!!",
-            "the wrist roll 😭😭😭 so cute",
-            "babies listening to their own voices is just so cute!",
-            "It's funny to think about how babies probably don't know when they say their first word because they probably think they're talking all the time.",
-            "Omg her covering her mouth while yawning… ugh adorable ☺️",
-            "That was the most in depth story ever! I was hooked",
-            "that's how her day went😂😂",
-            "the covering her mouth for the yawn 🥺❤️",
-            "i love baby voices 🥺🥺",
-            "oh my goodness she is so precious U0001f979",
-            "The caption U0001f979U0001f979",
-            "🥱🥱🥱oh my goodness🥰🥰🥰",
-            "it's like she's telling a very serious story about dada!😂😂🥰🥰🥰",
-            "I don’t want another baby i don’t want another baby i don’t want another baby 😂😂😩😩😩😩",
-            "her covering her yawn 🥺",
-            "OMG . So cute 🥰🥰",
-            "She is so adorable!!",
-            "Oh no she covered her mouth yawning!!!! That is so cute",]
+def is_english(text):
+    try:
+        language = detect(text)
+        return language == "en"
+    except LangDetectException:
+        return False
 
-video_ids = get_video_ids(api_key)
-comments = get_comments(api_key, video_ids)
 
-print("# of video ids: ", len(video_ids))
-print("# of video comments: ", len(comments))
+comment_data = pd.read_csv("comment_data.csv")
+raw_comments = comment_data["comments"].tolist()
+
+comments = [comment for comment in raw_comments if is_english(comment)]
+print(len(comments))
 
 result = []
 
@@ -260,17 +94,17 @@ punctuation = set(punctuation)
 
 
 def combo(sentence):
-    print("sentence before:", sentence)
+    # print("sentence before:", sentence)
 
     sentence = re.sub(r'[^\w\s]', '', sentence)
     sentence = remove_emoji(sentence)
 
-    print("sentence after:", sentence)
+    # print("sentence after:", sentence)
 
     duplicated_tokens = word_tokenize(sentence)
     tokens = list(set(duplicated_tokens))
 
-    print("dirty tokens:", tokens)
+    # print("dirty tokens:", tokens)
 
     accepted_list = []
 
@@ -284,7 +118,7 @@ def combo(sentence):
         and token.lower() not in punctuation
     ]
 
-    print("clean tokens:", cleaned_tokens)
+    # print("clean tokens:", cleaned_tokens)
 
     accepted_list.append(cleaned_tokens)
 
@@ -295,9 +129,9 @@ def combo(sentence):
 
     for i in range(len(cleaned_tokens)):
         for j in range(i+1, len(cleaned_tokens)+1):
-            if j - i > 1:  # Add this condition to only add combinations with more than one token
+            if j - i > 1 and j - i < 3:  # Add this condition to only add combinations with more than one token
+            # if j - i == 1:  # Change this condition to only add combinations with exactly one token
                 combinations.append(" ".join(cleaned_tokens[i:j]))
-    print("combinations", combinations)
 
     # calculate the frequency distribution of the words
     freq_dist = FreqDist(combinations)
@@ -306,7 +140,7 @@ def combo(sentence):
     num_unique_words = len(freq_dist)
 
     # calculate the number of words to include in the top 25%
-    num_top_words = int(num_unique_words * 0.25)
+    num_top_words = int(num_unique_words * 0.10)
 
     # construct a list of the top 25% most common words
     top_words = [word for word, freq in freq_dist.most_common(num_top_words)]
