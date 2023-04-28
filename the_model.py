@@ -13,6 +13,9 @@ from string import punctuation
 import string
 import re
 from langdetect import detect, LangDetectException
+import math
+from nltk.collocations import BigramAssocMeasures, BigramCollocationFinder
+from nltk.util import ngrams
 
 api_key = "9b38cabe85mshb282f035a7bb13cp1fce86jsnc1693aca1d59"
 
@@ -24,32 +27,6 @@ function_words = json.loads(urlopen(
 nltk.download('stopwords')
 
 stopwords = set(stopwords.words('english'))
-extra_words = {
-    'im', 'dont', 'bc', 'na',
-    'see', 'would', 'time', 'every',
-    'go', 'like', 'going', 'right',
-    'back', 'looks',
-    'i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves',
-    'you', "you're", "you've", "you'll", "you'd", 'your', 'yours', 'yourself', 'yourselves',
-    'he', 'him', 'his', 'himself', 'she', "she's", 'her', 'hers', 'herself',
-    'it', "it's", 'its', 'itself', 'they', 'them', 'their', 'theirs', 'themselves',
-    'what', 'which', 'who', 'whom', 'this', 'that', "that'll", 'these', 'those',
-    'am', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'having', 'do', 'does', 'did', 'doing',
-    'a', 'an', 'the', 'and', 'but', 'if', 'or', 'because', 'as', 'until', 'while', 'of', 'at', 'by', 'for', 'with', 'about', 'against', 'between', 'into', 'through', 'during', 'before', 'after',
-    'above', 'below', 'to', 'from', 'up', 'down', 'in', 'out', 'on', 'off', 'over', 'under', 'again', 'further', 'then', 'once', 'here', 'there', 'when', 'where', 'why', 'how',
-    'all', 'any', 'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such', 'only', 'own', 'same', 'so', 'than', 'too', 'very',
-    's', 't', 'can', 'will', 'just', 'don', "don't", 'should', "should've", 'now', 'd', 'll', 'm', 'o', 're', 've', 'y', 'ain', 'aren', "aren't", 'couldn', "couldn't", 'didnt', "didn't", 'doesnt', "doesn't", 'hadnt', "hadn't", 'hasnt', "hasn't", 'havent', "haven't", 'isnt', "isn't", 'ma', 'mightnt', "mightn't", 'mustnt', "mustn't", 'needn', "needn't", 'shan', "shan't", 'shouldnt', "shouldn't", 'wasn', "wasn't", 'weren', "weren't", 'won', "won't", 'wouldn', "wouldn't",
-    'bro', 'way', 'much', 'know', 'said', 'people', 'hes', 'got', 'comments', 'eyes', 'thank', 'love', 'oh', 'make', 'school', 'use', 'talking', 'videos', 'family', 'name',   'hello', 'goodbye', 'please', 'thank', 'yes', 'no', 'maybe', 'sure',
-    'morning', 'afternoon', 'evening', 'night', 'today', 'tomorrow', 'yesterday',
-    'work', 'job', 'office', 'home', 'house', 'apartment', 'family', 'friend', 'partner',
-    'eat', 'drink', 'food', 'breakfast', 'lunch', 'dinner', 'snack', 'meal',
-    'happy', 'sad', 'angry', 'excited', 'tired', 'bored', 'surprised', 'worried',
-    'school', 'college', 'university', 'class', 'teacher', 'student', 'study', 'learn',
-    'car', 'bus', 'train', 'bike', 'walk', 'drive', 'ride', 'transportation', 'vehicle', 'isnt', 'seen',
-    'one', 'get', 'say', 'good', 'feel', 'first', 'someone', 'thought', 'water', 'person', 'baby', 'whats', 'done', 'cat', 'ive', 'us', 'next', 'thing', 'something', 'could'
-}
-
-stopwords.update(extra_words)
 
 punctuation = list(punctuation)
 
@@ -64,36 +41,63 @@ def remove_emoji(text):
     return emoji_pattern.sub(r'', text)
 
 
+def idf(word, comments):
+    num_docs_with_word = sum(
+        1 for comment in comments if word in comment.lower())
+    return math.log(len(comments) / (1 + num_docs_with_word))
+
+
 def visualize_top_words(fdist, top_n=10):
     df = pd.DataFrame(fdist.most_common(top_n), columns=['Word', 'Frequency'])
-    sns.barplot(data=df, x='Frequency', y='Word')  # Switch x and y parameters
-    sns.despine()
-    plt.yticks(rotation=0)  # Set y-axis labels to be horizontal
-    plt.show()
+    if df.empty:
+        print("No top words found.")
+    else:
+        sns.barplot(data=df, x='Frequency', y='Word')
+        sns.despine()
+        plt.show()
 
 
-def is_english(text):
-    try:
-        language = detect(text)
-        return language == "en"
-    except LangDetectException:
-        return False
+def train_bigram_model(corpus):
+    words = [word.lower()
+             for sentence in corpus for word in word_tokenize(sentence)]
+    bigram_measures = BigramAssocMeasures()
+    finder = BigramCollocationFinder.from_words(words)
+    finder.apply_freq_filter(2)
+    scored_bigrams = finder.score_ngrams(bigram_measures.pmi)
+    return dict(scored_bigrams)
 
 
-comment_data = pd.read_csv("comment_data.csv")
-raw_comments = comment_data["comments"].tolist()
+def calculate_combinations(cleaned_tokens, bigram_model, threshold):
+    filtered_combinations = []
 
-comments = [comment for comment in raw_comments if is_english(comment)]
+    for i in range(len(cleaned_tokens)):
+        for j in range(i+1, len(cleaned_tokens)+1):
+            if j - i == 2:
+                bigram = tuple(cleaned_tokens[i:j])
+                if bigram in bigram_model and bigram_model[bigram] > threshold:
+                    filtered_combinations.append(" ".join(bigram))
+
+    return filtered_combinations
+
+
+comment_data = pd.read_csv("english_comments.csv", on_bad_lines='skip')
+# raw_comments = comment_data["comments"].tolist()
+comments = comment_data["comments"].tolist()
+
+# comments = [comment for comment in raw_comments if is_english(comment)]
 print(len(comments))
 
-result = []
 
+bigram_model = train_bigram_model(comments)
+pmi_threshold = 2
 stopwords = set(stopwords)
 function_words = set(function_words)
 punctuation = set(punctuation)
 
+result = []
 
-def combo(sentence):
+
+def combo(sentence, comments):
     # print("sentence before:", sentence)
 
     sentence = re.sub(r'[^\w\s]', '', sentence)
@@ -105,8 +109,6 @@ def combo(sentence):
     tokens = list(set(duplicated_tokens))
 
     # print("dirty tokens:", tokens)
-
-    accepted_list = []
 
     translator = str.maketrans('', '', string.punctuation)
 
@@ -120,27 +122,24 @@ def combo(sentence):
 
     # print("clean tokens:", cleaned_tokens)
 
-    accepted_list.append(cleaned_tokens)
+    combinations = calculate_combinations(
+        cleaned_tokens, bigram_model, pmi_threshold)
 
-    combinations = []
-    # for i in range(len(cleaned_tokens)):
-    #     for j in range(i+1, len(cleaned_tokens)+1):
-    #         combinations.append(" ".join(cleaned_tokens[i:j]))
+    idf_threshold = math.log(len(comments) * 0.2)
 
-    for i in range(len(cleaned_tokens)):
-        for j in range(i+1, len(cleaned_tokens)+1):
-            if j - i > 1 and j - i < 3:  # Add this condition to only add combinations with more than one token
-            # if j - i == 1:  # Change this condition to only add combinations with exactly one token
-                combinations.append(" ".join(cleaned_tokens[i:j]))
+    filtered_combinations = [word for word in combinations if idf(
+        word, comments) > idf_threshold]
+
+    # print(combinations)
 
     # calculate the frequency distribution of the words
-    freq_dist = FreqDist(combinations)
+    freq_dist = FreqDist(filtered_combinations)
 
     # determine the number of unique words in the text
     num_unique_words = len(freq_dist)
 
     # calculate the number of words to include in the top 25%
-    num_top_words = int(num_unique_words * 0.10)
+    num_top_words = int(num_unique_words * 0.5)
 
     # construct a list of the top 25% most common words
     top_words = [word for word, freq in freq_dist.most_common(num_top_words)]
@@ -148,7 +147,8 @@ def combo(sentence):
 
 
 for comment in comments:
-    combo(comment)
+    combo(comment, comments)
+
 
 flat_result = []
 

@@ -70,7 +70,9 @@ def get_comments(api_key, video_id_list, limit=100, offset=''):
             if data:  # Add this condition to check if data is not None
                 for i, comment in enumerate(data):
                     if i < limit:  # Add this condition to limit the number of comments per video
-                        comments.append((video_id, comment['text']))
+                        # Check if the comment is in English
+                        if langdetect.detect(comment['text']) == 'en':
+                            comments.append((video_id, comment['text']))
                     else:
                         break
         except ValueError:
@@ -83,12 +85,10 @@ def get_comments(api_key, video_id_list, limit=100, offset=''):
 def main():
     api_key = "9b38cabe85mshb282f035a7bb13cp1fce86jsnc1693aca1d59"
     comment_count = 0
-    file_exists = os.path.isfile("comment_data.csv")
+    file_exists = os.path.isfile("english_comment.csv")
 
-    with open("comment_data.csv", "a", newline="", encoding="utf-8") as csvfile:
+    with open("english_comments.csv", "a", newline="", encoding="utf-8") as csvfile:
         csv_writer = csv.writer(csvfile)
-        csv_writer.writerow(["videoid", "comments"])
-        
         # Only write the header if the file doesn't exist
         if not file_exists:
             csv_writer.writerow(["videoid", "comments"])
