@@ -1,8 +1,10 @@
+from dotenv import load_dotenv
 import requests
 import csv
 import time
 import os
 from langdetect import detect
+
 
 def get_video_ids(api_key, region='US', request_limit=200):
     url = "https://tiktok-all-in-one.p.rapidapi.com/feed"
@@ -83,7 +85,8 @@ def get_comments(api_key, video_id_list, limit=100, offset=''):
 
 
 def main():
-    api_key = "9b38cabe85mshb282f035a7bb13cp1fce86jsnc1693aca1d59"
+    load_dotenv()
+    api_key = os.getenv("RAPIDAPI_KEY")
     comment_count = 0
     file_exists = os.path.isfile("english_comment1.csv")
 
