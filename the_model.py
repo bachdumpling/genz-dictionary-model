@@ -80,7 +80,7 @@ def calculate_combinations(cleaned_tokens, bigram_model, threshold):
     return filtered_combinations
 
 
-comment_data = pd.read_csv("english_comments.csv", on_bad_lines='skip')
+comment_data = pd.read_csv("english_comments1.csv", on_bad_lines='skip')
 # raw_comments = comment_data["comments"].tolist()
 comments = comment_data["comments"].tolist()
 
@@ -89,7 +89,7 @@ print(len(comments))
 
 
 bigram_model = train_bigram_model(comments)
-pmi_threshold = 2
+pmi_threshold = 1
 stopwords = set(stopwords)
 function_words = set(function_words)
 punctuation = set(punctuation)
@@ -139,7 +139,7 @@ def combo(sentence, comments):
     num_unique_words = len(freq_dist)
 
     # calculate the number of words to include in the top 25%
-    num_top_words = int(num_unique_words * 0.5)
+    num_top_words = int(num_unique_words * 0.9)
 
     # construct a list of the top 25% most common words
     top_words = [word for word, freq in freq_dist.most_common(num_top_words)]
@@ -160,3 +160,4 @@ freq_dist = FreqDist(flat_result)
 
 print(freq_dist.most_common(10))
 visualize_top_words(freq_dist, 10)
+

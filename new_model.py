@@ -1,79 +1,125 @@
-from urllib.request import urlopen
-import json
-from langdetect import detect, LangDetectException
 import pandas as pd
-import csv
 import nltk
-from nltk import FreqDist
+import math
+from nltk import word_tokenize
 from nltk.util import ngrams
+from collections import Counter
+import string
 from nltk.corpus import stopwords
-nltk.download('punkt')
-nltk.download('stopwords')
+import re
+import json
+from urllib.request import urlopen
+from sklearn.feature_extraction.text import TfidfVectorizer
 
+
+# Load the dataset
+dataset = pd.read_csv("english_comments1.csv", on_bad_lines='skip')
+
+# Preprocess the data
+dataset['comments'] = dataset['comments'].str.lower()
+
+# Remove emojis
+def remove_emoji(text):
+    emoji_pattern = re.compile("["
+                               u"\U0001F600-\U0001F64F"  # emoticons
+                               u"\U0001F300-\U0001F5FF"  # symbols & pictographs
+                               u"\U0001F680-\U0001F6FF"  # transport & map symbols
+                               u"\U0001F1E0-\U0001F1FF"  # flags (iOS)
+                               "]+", flags=re.UNICODE)
+    return emoji_pattern.sub(r'', text)
+
+dataset['comments'] = dataset['comments'].apply(remove_emoji)
+
+# Tokenize the data
+tokenized_comments = [word_tokenize(comment) for comment in dataset['comments']]
+
+# Remove punctuation
+def remove_punctuation(tokens):
+    return [word for word in tokens if word not in string.punctuation]
+
+tokenized_comments = [remove_punctuation(tokens) for tokens in tokenized_comments]
+
+# Remove stopwords
+nltk.download('stopwords')
+stop_words = set(stopwords.words('english'))
+
+def remove_stopwords(tokens):
+    return [word for word in tokens if word not in stop_words]
+
+tokenized_comments = [remove_stopwords(tokens) for tokens in tokenized_comments]
+
+# Get the function_words
 function_words = json.loads(urlopen(
     "https://raw.githubusercontent.com/bachdumpling/genz-dictionary-model/main/function_words.json").read())
 
+# Remove function words
+def remove_function_words(tokens):
+    return [word for word in tokens if word not in function_words]
 
-def preprocess(text):
-    tokens = nltk.word_tokenize(text.lower())
-    stopwords_list = set(stopwords.words('english'))
-    return [token for token in tokens if token not in stopwords_list and token not in function_words]
+tokenized_comments = [remove_function_words(tokens) for tokens in tokenized_comments]
 
+# Calculate the Document Frequency (DF) of each word
+def document_frequency(tokenized_comments):
+    df = {}
+    for tokens in tokenized_comments:
+        unique_tokens = set(tokens)
+        for token in unique_tokens:
+            if token in df:
+                df[token] += 1
+            else:
+                df[token] = 1
+    return df
 
-def get_popular_words(comments, top_n=10, threshold_1=0.8, threshold_2=20):
-    all_words = []
-    all_bigrams = []
+df = document_frequency(tokenized_comments)
 
-    for comment in comments:
-        tokens = preprocess(comment)
-        all_words.extend(tokens)
-        all_bigrams.extend(ngrams(tokens, 2))
+# Calculate the Inverse Document Frequency (IDF) of each word
+def inverse_document_frequency(df, total_documents):
+    idf = {}
+    for word, count in df.items():
+        idf[word] = math.log10(total_documents / count)
+    return idf
 
-    total_comments = len(comments)
-    unigram_freq = FreqDist(all_words)
-    bigram_freq = FreqDist(all_bigrams)
+total_documents = len(tokenized_comments)
+idf = inverse_document_frequency(df, total_documents)
 
-    # Combine unigrams and bigrams
-    all_freq = unigram_freq + bigram_freq
+# Filter words based on the given IDF threshold
+idf_threshold = 0.9
+filtered_words = [word for word, value in idf.items() if value >= idf_threshold]
 
-    # Filter based on thresholds
-    filtered_words = {
-        word: freq
-        for word, freq in all_freq.items()
-        if freq >= threshold_2 and (freq / total_comments) <= threshold_1
-    }
+# Recreate unigrams and calculate their frequency
+unigrams = [ngrams(tokens, 1) for tokens in tokenized_comments]
+unigrams_flat = [unigram for comment_unigrams in unigrams for unigram in comment_unigrams]
 
-    # Sort the results and return the top 10
-    sorted_words = sorted(filtered_words.items(),
-                          key=lambda x: x[1], reverse=True)
-    return sorted_words[:top_n]
+# Calculate the frequency of filtered unigrams
+filtered_unigrams = [unigram for unigram in unigrams_flat if unigram[0] in filtered_words]
+filtered_unigram_freq = Counter(filtered_unigrams)
 
+# Sort the filtered unigram frequencies in descending order
+sorted_filtered_unigram_freq = filtered_unigram_freq.most_common()
 
-def read_comments_from_csv(file_name):
-    comments = []
-    with open(file_name, 'r', encoding='utf-8') as csvfile:
-        reader = csv.DictReader(csvfile)
-        for row in reader:
-            comments.append(row['comments'])
-    return comments
+# Get the top 10 most frequent filtered unigrams
+top_10_filtered_unigrams = sorted_filtered_unigram_freq[:10]
 
-# Read comments from the CSV file
+# Print the top 10 most frequent filtered unigrams
+# print("Top 10 most frequent filtered words:")
+# for rank, (unigram, count) in enumerate(top_10_filtered_unigrams, 1):
+#     print(f"{rank}. {unigram[0]}: {count}")
 
+# Create bigrams and calculate their frequency
+bigrams = [ngrams(tokens, 2) for tokens in tokenized_comments]
+bigrams_flat = [bigram for comment_bigrams in bigrams for bigram in comment_bigrams]
 
-def is_english(text):
-    try:
-        language = detect(text)
-        return language == "en"
-    except LangDetectException:
-        return False
+# Calculate the frequency of filtered bigrams
+filtered_bigrams = [bigram for bigram in bigrams_flat if all(word in filtered_words for word in bigram)]
+filtered_bigram_freq = Counter(filtered_bigrams)
 
+# Sort the filtered bigram frequencies in descending order
+sorted_filtered_bigram_freq = filtered_bigram_freq.most_common()
 
-comment_data = pd.read_csv("comment_data.csv", on_bad_lines='skip')
-raw_comments = comment_data["comments"].tolist()
+# Get the top 10 most frequent filtered bigrams
+top_10_filtered_bigrams = sorted_filtered_bigram_freq[:10]
 
-comments = [comment for comment in raw_comments if is_english(comment)]
-print(len(comments))
-
-# Get popular words/phrases
-popular_words = get_popular_words(comments)
-print(popular_words)
+# Print the top 10 most frequent filtered bigrams
+print("Top 10 most frequent filtered bigrams:")
+for rank, (bigram, count) in enumerate(top_10_filtered_bigrams, 1):
+    print(f"{rank}. {bigram[0]} {bigram[1]}: {count}")
