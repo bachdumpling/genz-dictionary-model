@@ -19,8 +19,6 @@ from nltk.collocations import BigramAssocMeasures, BigramCollocationFinder
 from nltk.util import ngrams
 from collections import Counter
 
-api_key = "9b38cabe85mshb282f035a7bb13cp1fce86jsnc1693aca1d59"
-
 # %%
 # Get the function_words
 function_words = json.loads(urlopen(
